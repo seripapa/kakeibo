@@ -180,6 +180,15 @@
     outline: none;
     transition: all 0.18s;
   }
+  /* iOSのdate入力は標準だと高さが膨らむので、他のフィールドと同じ太さに揃える */
+  .date-input {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 52px;
+    line-height: 1.2;
+    text-align: left;
+  }
+  .date-input::-webkit-date-and-time-value { text-align: left; }
   .date-input:focus, .text-input:focus, select:focus {
     border-color: var(--orange);
     box-shadow: 0 0 0 4px var(--orange-100);
@@ -216,7 +225,18 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 7px;
+    will-change: transform;
   }
+  @keyframes catSlideFromRight {
+    from { transform: translateX(60px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+  }
+  @keyframes catSlideFromLeft {
+    from { transform: translateX(-60px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+  }
+  .cat-grid.slide-from-right { animation: catSlideFromRight 0.24s cubic-bezier(0.22,0.61,0.36,1); }
+  .cat-grid.slide-from-left  { animation: catSlideFromLeft  0.24s cubic-bezier(0.22,0.61,0.36,1); }
   .cat-btn {
     padding: 13px 4px;
     border: 1.5px solid var(--border-strong);
@@ -1252,6 +1272,10 @@
     }
     .annual-table td.target:hover { background: var(--orange-100); }
     .annual-table td.target.empty { color: var(--text-mute); font-weight: 600; }
+    .annual-table td.target.derived {
+      background: #FFF4EC; color: var(--orange-deep); font-weight: 800;
+      cursor: default; font-style: italic;
+    }
     .annual-table td.target input {
       width: 100%; padding: 4px 6px; text-align: right;
       border: 1.5px solid var(--orange); border-radius: 6px;
@@ -1388,9 +1412,38 @@
     .assets-table tr.diff-row td.diff.pos { color: var(--green); }
     .assets-table tr.diff-row td.diff.neg { color: var(--red); }
   }
+
+  /* ===== 起動スプラッシュ（白背景＋アイコン） ===== */
+  .splash {
+    position: fixed; inset: 0; z-index: 99999;
+    background: #FFFFFF;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px;
+    transition: opacity 0.45s ease;
+  }
+  .splash img {
+    width: 132px; height: 132px; border-radius: 30px;
+    box-shadow: 0 10px 30px rgba(255,107,53,0.25);
+    animation: splashPop 0.5s cubic-bezier(0.22,0.61,0.36,1);
+  }
+  .splash .splash-title {
+    font-size: 15px; font-weight: 800; color: var(--orange-deep);
+    letter-spacing: 0.12em;
+  }
+  @keyframes splashPop {
+    0%   { transform: scale(0.82); opacity: 0; }
+    60%  { transform: scale(1.04); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .splash.hide { opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
+<!-- 起動スプラッシュ -->
+<div class="splash" id="splash">
+  <img src="icon-512.png" alt="家計簿">
+  <div class="splash-title">家計簿</div>
+</div>
 <div class="mobile-shell">
 <div class="app">
   <div class="header">
@@ -2441,14 +2494,32 @@ function initInput() {
     btn.addEventListener('click', () => setMobileSubMode(btn.dataset.sub));
   });
 
-  // カテゴリ欄の左右スワイプで 変動費⇄固定費⇄特別費 を切替
-  const SUB_ORDER = ['variable', 'fixed', 'special'];
+  // カテゴリ欄の左右スワイプで 変動費⇄固定費⇄特別費 を切替（指に追従＋スライド演出）
   const swipeArea = document.getElementById('catContainer');
-  let touchStartX = 0, touchStartY = 0, touchTracking = false;
+  let touchStartX = 0, touchStartY = 0, touchTracking = false, isHoriz = false;
   swipeArea.addEventListener('touchstart', e => {
     if (state.mode !== 'expense') { touchTracking = false; return; }
     const t = e.changedTouches[0];
-    touchStartX = t.clientX; touchStartY = t.clientY; touchTracking = true;
+    touchStartX = t.clientX; touchStartY = t.clientY; touchTracking = true; isHoriz = false;
+  }, { passive: true });
+  swipeArea.addEventListener('touchmove', e => {
+    if (!touchTracking || state.mode !== 'expense') return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const grid = swipeArea.querySelector('.cat-grid');
+    if (!grid) return;
+    // 横移動が縦より大きければ指に追従させる
+    if (!isHoriz && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) isHoriz = true;
+    if (isHoriz) {
+      // 端では引っ張り抵抗（弱める）
+      const idx = SUB_ORDER.indexOf(state.subMode);
+      const atEdge = (dx > 0 && idx === 0) || (dx < 0 && idx === SUB_ORDER.length - 1);
+      const follow = atEdge ? dx * 0.3 : dx;
+      grid.style.transition = 'none';
+      grid.style.transform = `translateX(${follow}px)`;
+      grid.style.opacity = String(Math.max(0.4, 1 - Math.abs(follow) / 400));
+    }
   }, { passive: true });
   swipeArea.addEventListener('touchend', e => {
     if (!touchTracking || state.mode !== 'expense') return;
@@ -2456,13 +2527,23 @@ function initInput() {
     const t = e.changedTouches[0];
     const dx = t.clientX - touchStartX;
     const dy = t.clientY - touchStartY;
+    const grid = swipeArea.querySelector('.cat-grid');
     // 横方向に50px以上、かつ縦より横の動きが大きいときだけスワイプと判定
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) {
+      // 戻す
+      if (grid) { grid.style.transition = 'transform 0.2s, opacity 0.2s'; grid.style.transform = ''; grid.style.opacity = ''; }
+      return;
+    }
     const idx = SUB_ORDER.indexOf(state.subMode);
     const next = dx < 0
       ? SUB_ORDER[Math.min(SUB_ORDER.length - 1, idx + 1)]  // 左スワイプ → 次へ
       : SUB_ORDER[Math.max(0, idx - 1)];                     // 右スワイプ → 前へ
-    if (next !== state.subMode) setMobileSubMode(next);
+    if (next !== state.subMode) {
+      setMobileSubMode(next);
+    } else if (grid) {
+      // 端で切替なし → 戻す
+      grid.style.transition = 'transform 0.2s, opacity 0.2s'; grid.style.transform = ''; grid.style.opacity = '';
+    }
   }, { passive: true });
 
   renderCatContainer();
@@ -2514,14 +2595,24 @@ function refreshItemSuggest() {
   dl.innerHTML = items.map(i => `<option value="${i.replace(/"/g, '&quot;')}">`).join('');
 }
 
-// サブモード（変動費/固定費/特別費）切替の共通処理（ボタン・スワイプ両方から呼ぶ）
+// サブモード（変動費/固定費/特別費）の順序（スワイプ・アニメ方向の判定に使用）
+const SUB_ORDER = ['variable', 'fixed', 'special'];
+
+// サブモード切替の共通処理（ボタン・スワイプ両方から呼ぶ）
 function setMobileSubMode(sub) {
-  if (!['variable', 'fixed', 'special'].includes(sub)) return;
+  if (!SUB_ORDER.includes(sub)) return;
+  const oldIdx = SUB_ORDER.indexOf(state.subMode);
+  const newIdx = SUB_ORDER.indexOf(sub);
   state.subMode = sub;
   document.querySelectorAll('#subSeg button').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
   state.selectedCategory = null;
   state.selectedType = null;
   renderCatContainer();
+  // 新しいグリッドを進行方向からスライドイン
+  if (oldIdx !== newIdx) {
+    const grid = document.querySelector('#catContainer .cat-grid');
+    if (grid) grid.classList.add(newIdx > oldIdx ? 'slide-from-right' : 'slide-from-left');
+  }
   updateSaveButton();
 }
 
@@ -4059,14 +4150,18 @@ function renderAnnualTable() {
   html += '</tr></thead><tbody>';
 
   // --- データ行（カテゴリ）---
-  function dataRow(label, monthVals, { targetKey = null, type = 'expense', highlightOver = false } = {}) {
-    const target = targetKey ? (targets[targetKey] || 0) : 0;
+  // fixedTarget: 数値を渡すと「編集不可の自動算出目標」として表示（給与＝変動＋固定など）
+  function dataRow(label, monthVals, { targetKey = null, fixedTarget = null, type = 'expense', highlightOver = false } = {}) {
+    const hasTarget = (fixedTarget != null) || !!targetKey;
+    const target = fixedTarget != null ? fixedTarget : (targetKey ? (targets[targetKey] || 0) : 0);
     const total = months.reduce((s, m) => s + (monthVals[m] || 0), 0);
     const monthsWithVal = months.filter(m => monthVals[m]).length;
     const avg = monthsWithVal > 0 ? total / monthsWithVal : 0;
     let h = '<tr>';
     h += `<td class="cat">${label}</td>`;
-    if (targetKey) {
+    if (fixedTarget != null) {
+      h += `<td class="target derived" title="変動費＋固定費の目標合計（自動）">${target ? fmtYen(target) : '—'}</td>`;
+    } else if (targetKey) {
       h += `<td class="target ${target ? '' : 'empty'}" data-target-key="${targetKey}">${target ? fmtYen(target) : '—'}</td>`;
     } else {
       h += `<td class="target empty">—</td>`;
@@ -4080,26 +4175,35 @@ function renderAnnualTable() {
     });
     h += `<td class="avg">${avg ? fmtYen(Math.round(avg)) : '—'}</td>`;
     h += `<td class="total">${total ? fmtYen(total) : '—'}</td>`;
-    h += `<td class="progress">${targetKey ? progressCell(type, target, total, elapsedMonths) : ''}</td>`;
+    h += `<td class="progress">${hasTarget ? progressCell(type, target, total, elapsedMonths) : ''}</td>`;
     h += '</tr>';
     return h;
   }
 
   // --- 小計行（カテゴリ群の合算）---
-  function subtotalRow(label, cats) {
+  // opts.targetKey: 指定すると小計の目標を1つの編集可能セルにする（特別費合計など）
+  // opts.progressType: 進捗判定の種別（既定 'expense'）
+  function subtotalRow(label, cats, opts = {}) {
     const byMonth = {};
     months.forEach(m => byMonth[m] = sumCatsMonth(cats, m));
-    const targetSum = cats.reduce((s, c) => s + (targets[c] || 0), 0);
     const total = months.reduce((s, m) => s + byMonth[m], 0);
     const monthsWith = months.filter(m => byMonth[m]).length;
     const avg = monthsWith > 0 ? total / monthsWith : 0;
+    let targetSum, targetCell;
+    if (opts.targetKey) {
+      targetSum = targets[opts.targetKey] || 0;
+      targetCell = `<td class="target ${targetSum ? '' : 'empty'}" data-target-key="${opts.targetKey}">${targetSum ? fmtYen(targetSum) : '—'}</td>`;
+    } else {
+      targetSum = cats.reduce((s, c) => s + (targets[c] || 0), 0);
+      targetCell = `<td class="target">${targetSum ? fmtYen(targetSum) : '—'}</td>`;
+    }
     let h = '<tr class="subtotal">';
     h += `<td class="cat">${label}</td>`;
-    h += `<td class="target">${targetSum ? fmtYen(targetSum) : '—'}</td>`;
+    h += targetCell;
     months.forEach(m => h += `<td>${byMonth[m] ? fmtYen(byMonth[m]) : '—'}</td>`);
     h += `<td class="avg">${avg ? fmtYen(Math.round(avg)) : '—'}</td>`;
     h += `<td class="total">${total ? fmtYen(total) : '—'}</td>`;
-    h += `<td class="progress">${progressCell('expense', targetSum, total, elapsedMonths)}</td>`;
+    h += `<td class="progress">${progressCell(opts.progressType || 'expense', targetSum, total, elapsedMonths)}</td>`;
     h += '</tr>';
     return { html: h, byMonth, total };
   }
@@ -4124,9 +4228,14 @@ function renderAnnualTable() {
     return h;
   }
 
+  // 給与の目標 = 変動費目標合計 ＋ 固定費目標合計（収支トントンを目指すため自動算出）
+  const varTargetSum = CATEGORIES.variable.reduce((s, c) => s + (targets[c] || 0), 0);
+  const fixTargetSum = CATEGORIES.fixed.reduce((s, c) => s + (targets[c] || 0), 0);
+  const salaryTarget = varTargetSum + fixTargetSum;
+
   // ===== 収入（給与）=====
   html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">収入（給与）</td></tr>`;
-  html += dataRow('給与', catMonth['給与'] || {}, { targetKey: '給与', type: 'income' });
+  html += dataRow('給与', catMonth['給与'] || {}, { fixedTarget: salaryTarget, type: 'income' });
 
   // ===== 変動費 =====
   html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">変動費</td></tr>`;
@@ -4149,16 +4258,22 @@ function renderAnnualTable() {
   months.forEach(m => monthlyBal[m] = ((catMonth['給与'] && catMonth['給与'][m]) || 0) - varSub.byMonth[m] - fixSub.byMonth[m]);
   html += balanceRow('月次収支（給与 − 変動 − 固定）', monthlyBal, 'balance-row');
 
-  // ===== 特別（特別報酬・特別費）=====
-  html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">特別</td></tr>`;
+  // ===== 特別報酬 =====
+  html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">特別報酬</td></tr>`;
   html += dataRow('特別報酬', catMonth['特別報酬'] || {}, { targetKey: '特別報酬', type: 'income' });
-  const specByMonth = {};
-  months.forEach(m => specByMonth[m] = sumCatsMonth(CATEGORIES.special, m));
-  html += dataRow('特別費（合計）', specByMonth, { targetKey: 'special_total', type: 'special' });
+
+  // ===== 特別費（項目別）=====
+  html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">特別費</td></tr>`;
+  CATEGORIES.special.forEach(c => {
+    html += dataRow(c, catMonth[c] || {}, { type: 'special' });
+  });
+  // 特別費 小計（目標は special_total を1つ編集／年間合計で進捗判定）
+  const specSub = subtotalRow('特別費 小計', CATEGORIES.special, { targetKey: 'special_total', progressType: 'special' });
+  html += specSub.html;
 
   // ===== 特別収支（特別報酬 − 特別費）=====
   const specialBal = {};
-  months.forEach(m => specialBal[m] = ((catMonth['特別報酬'] && catMonth['特別報酬'][m]) || 0) - specByMonth[m]);
+  months.forEach(m => specialBal[m] = ((catMonth['特別報酬'] && catMonth['特別報酬'][m]) || 0) - specSub.byMonth[m]);
   html += balanceRow('特別収支（特別報酬 − 特別費）', specialBal, 'balance-row');
 
   // ===== 総収支（すべて合算）=====
@@ -4353,6 +4468,23 @@ window.addEventListener('resize', () => { if (isDesktop()) renderDesktop(); });
 initInput();
 initList();
 if (isDesktop()) renderDesktop();
+
+// 起動スプラッシュをフェードアウト（最低600ms表示）
+(function hideSplash() {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  const start = performance.now();
+  const minShow = 600;
+  const doHide = () => {
+    const wait = Math.max(0, minShow - (performance.now() - start));
+    setTimeout(() => {
+      splash.classList.add('hide');
+      setTimeout(() => splash.remove(), 500);
+    }, wait);
+  };
+  if (document.readyState === 'complete') doHide();
+  else window.addEventListener('load', doHide, { once: true });
+})();
 </script>
 </body>
 </html>
