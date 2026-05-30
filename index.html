@@ -454,6 +454,22 @@
     border-radius: 100px; margin-top: 6px; overflow: hidden;
   }
   .cat-row .barrow > div { height: 100%; border-radius: 100px; transition: width 0.3s; }
+  /* 目標オーバー警告（PC版と統一） */
+  .cat-row.over { background: linear-gradient(90deg, #FFE0E4 0%, transparent 75%); border-radius: 8px; }
+  .cat-row.over .label-text { color: var(--red); font-weight: 800; }
+  .cat-row.over .amount { color: var(--red); font-weight: 800; }
+  .cat-row.warn .label-text { color: var(--amber); font-weight: 800; }
+  .cat-row .over-tag {
+    display: inline-block; margin-left: 6px; padding: 1px 7px;
+    background: #E04C5A; color: var(--white); font-size: 9px; font-weight: 800;
+    border-radius: 100px; vertical-align: middle;
+  }
+  .cat-row .warn-tag {
+    display: inline-block; margin-left: 6px; padding: 1px 7px;
+    background: #FFF1DC; color: var(--amber); font-size: 9px; font-weight: 800;
+    border-radius: 100px; border: 1px solid #FFD89A; vertical-align: middle;
+  }
+  .cat-row .target-sub { margin-left: 5px; font-size: 10px; color: var(--text-mute); font-weight: 600; }
   .cat-table-foot {
     display: flex; justify-content: space-between; padding: 12px 0 0;
     border-top: 2px solid var(--orange); margin-top: 4px;
@@ -2334,15 +2350,11 @@ APR_DETAIL.forEach(([d, item, amount, cat]) => {
 });
 
 const MAY_DETAIL = [
-  ['2026-05-01', '通勤', 334, '慶Pasmo'],
-  ['2026-05-02', 'クリーニング', 2615, '家具・被服'],
-  ['2026-05-02', 'カクヤス', 1188, '慶お小遣い'],
   ['2026-05-03', '野菜ジュース', 2259, 'Baby'],
   ['2026-05-03', 'イオン', 1757, 'Baby'],
   ['2026-05-03', '味ん味ん', 10857, '外食'],
   ['2026-05-03', 'スタバ', 394, '慶お小遣い'],
   ['2026-05-03', 'タクシー', 3100, '車両費・ETC'],
-  ['2026-05-03', 'QBHOUSE', 1400, '美容院'],
   ['2026-05-04', '新百合ヶ丘', 648, '慶Pasmo'],
   ['2026-05-05', 'オーケー', 4217, '食費'],
   ['2026-05-05', 'イオン', 4005, '食費'],
@@ -2368,27 +2380,44 @@ const MAY_DETAIL = [
   ['2026-05-15', '一時保育', 1800, 'Baby'],
   ['2026-05-15', '水筒', 4952, 'Baby'],
   ['2026-05-15', 'オーケー', 3972, '食費'],
+  ['2026-05-16', '中野', 2074, '慶Pasmo'],
   ['2026-05-16', 'Espoir', 2235, '慶お小遣い'],
   ['2026-05-16', 'サンクトガーレン', 995, '慶お小遣い'],
-  ['2026-05-16', 'イオンネットスーパー', 4486, '食費'],
   ['2026-05-16', '自販機', 330, '慶お小遣い'],
-  ['2026-05-16', '中野', 2074, '慶Pasmo'],
+  ['2026-05-16', 'イオンネットスーパー', 4486, '食費'],
   ['2026-05-17', 'ウェルシア', 2288, '雑費'],
   ['2026-05-18', 'アンパンマンミュージアム', 6600, '家族交際費'],
   ['2026-05-18', 'メレンゲ', 6006, '外食'],
   ['2026-05-18', 'アンパンマン', 1130, '慶Pasmo'],
   ['2026-05-19', 'Kindle本', 637, '慶お小遣い'],
-  ['2026-05-20', 'LAWSON', 279, '慶お小遣い'],
   ['2026-05-20', '通勤', 334, '慶Pasmo'],
+  ['2026-05-20', 'LAWSON', 279, '慶お小遣い'],
+  ['2026-05-21', '吉野家', 154, '外食'],
   ['2026-05-21', '通勤', 334, '慶Pasmo'],
-  ['2026-05-22', '通勤', 334, '慶Pasmo'],
   ['2026-05-21', 'Claude', 3659, '慶お小遣い'],
   ['2026-05-21', 'イオン', 4064, '食費'],
-  ['2026-05-21', '吉野家', 154, '外食'],
   ['2026-05-22', '一時保育', 1800, 'Baby'],
+  ['2026-05-22', '通勤', 334, '慶Pasmo'],
+  ['2026-05-23', 'セブンイレブン', 237, '慶お小遣い'],
   ['2026-05-24', '茅ヶ崎駐車場', 1000, '家族交際費'],
   ['2026-05-24', 'タイムズカーシェア', 6350, '車両費・ETC'],
   ['2026-05-25', 'キッズランド', 1300, '家族交際費'],
+  ['2026-05-25', 'サイゼリヤ', 850, '外食'],
+  ['2026-05-26', 'TP-LINK WIFI', 14800, '家電'],
+  ['2026-05-26', 'クリーニング', 1154, '慶お小遣い'],
+  ['2026-05-26', 'とうもろこし茶', 2712, '食費'],
+  ['2026-05-27', 'セブンイレブン', 181, '慶お小遣い'],
+  ['2026-05-27', 'オーケー', 1190, '食費'],
+  ['2026-05-28', 'KFC', 1960, '外食'],
+  ['2026-05-28', 'イオンネットスーパー', 5691, '食費'],
+  ['2026-05-29', 'セブンイレブン', 345, '食費'],
+  ['2026-05-29', '酒井医院', 610, '医療費'],
+  ['2026-05-03', 'QBHOUSE', 1400, '美容院'],
+  ['2026-05-02', 'クリーニング', 2615, '家具・被服'],
+  ['2026-05-02', 'カクヤス', 1188, '慶お小遣い'],
+  ['2026-05-01', '通勤', 334, '慶Pasmo'],
+  ['2026-05-30', 'ぶっ豚', 1190, '慶お小遣い'],
+  ['2026-05-30', 'ドトール', 280, '慶お小遣い'],
 ];
 MAY_DETAIL.forEach(([d, item, amount, cat]) => {
   RECORDS.push({ id: newId(), date: d, item, amount, category: cat, type: catToType[cat] });
@@ -2408,8 +2437,8 @@ SALARY.forEach((amt, i) => {
 // ==========================================
 // ローカル保存（ブラウザに永続化）
 // ==========================================
-const STORAGE_KEY = 'kakeibo_records_v4';
-const SEED_FLAG_KEY = 'kakeibo_seeded_v4';
+const STORAGE_KEY = 'kakeibo_records_v5';
+const SEED_FLAG_KEY = 'kakeibo_seeded_v5';
 const SUB_STORAGE_KEY = 'kakeibo_subscriptions_v1';
 
 function loadFromStorage() {
@@ -2779,17 +2808,33 @@ function renderCatTable(ym) {
     return;
   }
 
+  // 目標（年単位）を取得して超過率を表示（PC版と統一）
+  const year = ym.split('-')[0];
+  const targets = getYearTargets(year);
+
   entries.forEach(([cat, amt]) => {
     const pct = sum > 0 ? (amt / sum * 100) : 0;
-    const color = CATEGORY_COLORS[cat] || '#CCC';
+    const target = targets[cat] || 0;
+    const overRatio = target > 0 ? amt / target : 0;
+    let overClass = '', overTag = '';
+    if (target > 0) {
+      if (overRatio > 1) {
+        overClass = ' over';
+        overTag = `<span class="over-tag">超過 +${fmtYen(amt - target)}</span>`;
+      } else if (overRatio > 0.85) {
+        overClass = ' warn';
+        overTag = `<span class="warn-tag">${Math.round(overRatio*100)}%</span>`;
+      }
+    }
+    const color = overRatio > 1 ? '#E04C5A' : (CATEGORY_COLORS[cat] || '#CCC');
     const row = document.createElement('div');
-    row.className = 'cat-row';
+    row.className = 'cat-row' + overClass;
     row.innerHTML = `
       <div class="name">
         <span class="swatch" style="background:${color}"></span>
-        <span class="label-text">${cat}</span>
+        <span class="label-text">${cat}${overTag}</span>
       </div>
-      <div class="amount">${fmtYen(amt)}</div>
+      <div class="amount">${fmtYen(amt)}${target > 0 ? `<span class="target-sub">/ ${fmtYen(target)}</span>` : ''}</div>
       <div class="pct">${pct.toFixed(1)}%</div>
       <div class="barrow"><div style="width:${pct}%; background:${color}"></div></div>
     `;
@@ -4043,23 +4088,23 @@ document.getElementById('deskSubOverlay').addEventListener('click', closeDeskSub
 // ==========================================
 // 年間サマリー（PC: 📊年間ボタン）
 // ==========================================
-const TARGETS_KEY = 'kakeibo_targets_v1';
+const TARGETS_KEY = 'kakeibo_targets_v2';
 const ASSETS_KEY  = 'kakeibo_assets_v1';
 const DEFAULT_ACCOUNTS = ['auじぶん銀行', 'みずほ銀行', '野村證券', 'アマダ持株会'];
 const OLD_DEFAULT_ACCOUNTS = ['口座1', '口座2', '口座3', '口座4'];
 
 // デフォルト目標（スプレッドシートの値）
 const DEFAULT_TARGETS_2026 = {
-  // 変動費
-  '食費': 45000, '外食': 15000, '家族交際費': 15000, '雑費': 10000, 'Baby': 25000,
-  '医療費': 5000, '車両費・ETC': 10000, '美容院': 8000, '慶お小遣い': 30000, '慶Pasmo': 5000,
-  // 固定費（目安）
-  '通信・サブスク': 15000, '住居': 100000, '水道': 5000, '電気': 8000, 'ガス': 4000,
-  '里紗お小遣い': 30000, 'ジム': 8000, '小田急定期': 6000,
+  // 変動費（スプレッドシート「月次家計簿」C列）
+  '食費': 46000, '外食': 15000, '家族交際費': 15000, '雑費': 12000, 'Baby': 22000,
+  '医療費': 13000, '車両費・ETC': 8000, '美容院': 9000, '慶お小遣い': 25000, '慶Pasmo': 3660,
+  // 固定費（C列）
+  '通信・サブスク': 12000, '住居': 86540, '水道': 3300, '電気': 10400, 'ガス': 7700,
+  '里紗お小遣い': 10000, 'ジム': 4400, '小田急定期': 4000,
   // 特別費（合計1つ）
   'special_total': 90000,
-  // 収入
-  '給与': 400000, '特別報酬': 200000,
+  // 特別報酬（任意）
+  '特別報酬': 200000,
 };
 
 function loadTargets() {
@@ -4126,9 +4171,8 @@ function renderAnnualTable() {
   const catMonth = {}; // { catName: { '01': sum, '02': sum, ... } }
   yearRecs.forEach(r => {
     const m = r.date.slice(5, 7);
-    // 賞与・一時金は「特別報酬」として1行にまとめる
-    let key = r.category;
-    if (r.type === 'income' && (r.category === '賞与' || r.category === '一時金')) key = '特別報酬';
+    // 賞与・一時金はカテゴリ別にそのまま保持（特別報酬セクションで項目別に表示）
+    const key = r.category;
     if (!catMonth[key]) catMonth[key] = {};
     catMonth[key][m] = (catMonth[key][m] || 0) + r.amount;
   });
@@ -4258,9 +4302,14 @@ function renderAnnualTable() {
   months.forEach(m => monthlyBal[m] = ((catMonth['給与'] && catMonth['給与'][m]) || 0) - varSub.byMonth[m] - fixSub.byMonth[m]);
   html += balanceRow('月次収支（給与 − 変動 − 固定）', monthlyBal, 'balance-row');
 
-  // ===== 特別報酬 =====
+  // ===== 特別報酬（項目別：賞与・一時金）=====
+  const REWARD_CATS = ['賞与', '一時金'];
   html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">特別報酬</td></tr>`;
-  html += dataRow('特別報酬', catMonth['特別報酬'] || {}, { targetKey: '特別報酬', type: 'income' });
+  REWARD_CATS.forEach(c => {
+    html += dataRow(c, catMonth[c] || {}, { type: 'income' });
+  });
+  const rewardSub = subtotalRow('特別報酬 小計', REWARD_CATS, { progressType: 'income' });
+  html += rewardSub.html;
 
   // ===== 特別費（項目別）=====
   html += `<tr class="section"><td class="cat" colspan="${TOTAL_COLS}">特別費</td></tr>`;
@@ -4273,7 +4322,7 @@ function renderAnnualTable() {
 
   // ===== 特別収支（特別報酬 − 特別費）=====
   const specialBal = {};
-  months.forEach(m => specialBal[m] = ((catMonth['特別報酬'] && catMonth['特別報酬'][m]) || 0) - specSub.byMonth[m]);
+  months.forEach(m => specialBal[m] = rewardSub.byMonth[m] - specSub.byMonth[m]);
   html += balanceRow('特別収支（特別報酬 − 特別費）', specialBal, 'balance-row');
 
   // ===== 総収支（すべて合算）=====
