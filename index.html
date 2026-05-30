@@ -17,6 +17,7 @@
 <!-- ファビコン -->
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --orange: #FF6B35;
@@ -1452,6 +1453,70 @@
     100% { transform: scale(1); opacity: 1; }
   }
   .splash.hide { opacity: 0; pointer-events: none; }
+
+  /* ===== ログイン画面 ===== */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 99998;
+    background: linear-gradient(180deg, #FFEFE5 0%, #FAF6F2 100%);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .login-overlay.show { display: flex; }
+  .login-card {
+    width: 100%; max-width: 360px;
+    background: var(--white); border-radius: 22px;
+    box-shadow: 0 14px 50px rgba(58,30,8,0.12);
+    padding: 32px 26px; text-align: center;
+  }
+  .login-card .login-icon {
+    width: 84px; height: 84px; border-radius: 20px; margin: 0 auto 16px;
+    box-shadow: 0 8px 22px rgba(255,107,53,0.25);
+  }
+  .login-card h2 {
+    font-size: 20px; font-weight: 800; color: var(--orange-deep); margin-bottom: 4px;
+  }
+  .login-card .login-sub {
+    font-size: 12px; color: var(--text-sub); margin-bottom: 22px; font-weight: 600;
+  }
+  .login-card label {
+    display: block; text-align: left; font-size: 11px; font-weight: 800;
+    color: var(--orange-deep); margin: 0 0 6px 2px; letter-spacing: 0.06em;
+  }
+  .login-card input {
+    width: 100%; padding: 14px; margin-bottom: 16px;
+    border: 1.5px solid var(--border-strong); border-radius: 12px;
+    font-size: 16px; font-family: inherit; color: var(--text);
+    background: var(--orange-50); outline: none; transition: all 0.18s;
+  }
+  .login-card input:focus {
+    border-color: var(--orange); background: var(--white);
+    box-shadow: 0 0 0 4px var(--orange-100);
+  }
+  .login-card .login-btn {
+    width: 100%; padding: 15px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-deep));
+    color: var(--white); font-size: 15px; font-weight: 800; cursor: pointer;
+    font-family: inherit; box-shadow: 0 6px 18px rgba(255,107,53,0.3);
+    transition: transform 0.12s, opacity 0.18s;
+  }
+  .login-card .login-btn:active { transform: scale(0.97); }
+  .login-card .login-btn:disabled { opacity: 0.6; cursor: default; }
+  .login-card .login-err {
+    color: var(--red); font-size: 12px; font-weight: 700; min-height: 18px;
+    margin-top: 12px;
+  }
+  .login-card .login-note {
+    font-size: 10.5px; color: var(--text-mute); margin-top: 18px; line-height: 1.6;
+  }
+  /* 同期インジケータ */
+  .sync-badge {
+    position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+    background: rgba(42,31,26,0.85); color: #fff; font-size: 12px; font-weight: 700;
+    padding: 8px 16px; border-radius: 100px; z-index: 9000;
+    opacity: 0; transition: opacity 0.25s; pointer-events: none;
+  }
+  .sync-badge.show { opacity: 1; }
+  @media (min-width: 1024px) { .sync-badge { bottom: 30px; } }
 </style>
 </head>
 <body>
@@ -1460,6 +1525,28 @@
   <img src="icon-512.png" alt="家計簿">
   <div class="splash-title">家計簿</div>
 </div>
+
+<!-- ログイン画面 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <img class="login-icon" src="icon-192.png" alt="家計簿">
+    <h2>家計簿</h2>
+    <div class="login-sub">家族のメールとパスワードでログイン</div>
+    <form id="loginForm">
+      <label for="loginEmail">メールアドレス</label>
+      <input type="email" id="loginEmail" autocomplete="username" inputmode="email" placeholder="you@example.com" required>
+      <label for="loginPass">パスワード</label>
+      <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••" required>
+      <button type="submit" class="login-btn" id="loginBtn">ログイン</button>
+      <div class="login-err" id="loginErr"></div>
+    </form>
+    <div class="login-note">夫婦共有のアカウントです。<br>データは家族だけが閲覧できます。</div>
+  </div>
+</div>
+
+<!-- 同期インジケータ -->
+<div class="sync-badge" id="syncBadge">同期中…</div>
+
 <div class="mobile-shell">
 <div class="app">
   <div class="header">
@@ -2454,6 +2541,7 @@ function loadFromStorage() {
 
 function persist() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records)); } catch (e) {}
+  if (window.cloudSync) window.cloudSync.push();
 }
 
 // 初回読み込み：保存済みデータがあればそれを使う。なければスプレッドシートの初期データ。
@@ -3954,6 +4042,7 @@ state.subscriptions = loadSubscriptions();
 
 function persistSubscriptions() {
   try { localStorage.setItem(SUB_STORAGE_KEY, JSON.stringify(state.subscriptions)); } catch (e) {}
+  if (window.cloudSync) window.cloudSync.push();
 }
 
 function applySubscriptionsToDB() {
@@ -4111,7 +4200,7 @@ function loadTargets() {
   try { return JSON.parse(localStorage.getItem(TARGETS_KEY) || '{}'); }
   catch(e) { return {}; }
 }
-function saveTargets(obj) { localStorage.setItem(TARGETS_KEY, JSON.stringify(obj)); }
+function saveTargets(obj) { localStorage.setItem(TARGETS_KEY, JSON.stringify(obj)); if (window.cloudSync) window.cloudSync.push(); }
 
 function getYearTargets(year) {
   const all = loadTargets();
@@ -4137,7 +4226,7 @@ function loadAssets() {
   try { return JSON.parse(localStorage.getItem(ASSETS_KEY) || '{}'); }
   catch(e) { return {}; }
 }
-function saveAssets(obj) { localStorage.setItem(ASSETS_KEY, JSON.stringify(obj)); }
+function saveAssets(obj) { localStorage.setItem(ASSETS_KEY, JSON.stringify(obj)); if (window.cloudSync) window.cloudSync.push(); }
 function getYearAssets(year) {
   const all = loadAssets();
   if (!all[year]) {
@@ -4533,6 +4622,200 @@ if (isDesktop()) renderDesktop();
   };
   if (document.readyState === 'complete') doHide();
   else window.addEventListener('load', doHide, { once: true });
+})();
+
+// ==========================================
+// Supabase クラウド同期
+// ==========================================
+(function setupCloudSync() {
+  const SUPABASE_URL = 'https://nohoawuqssydkguzfppq.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_5D_8c7Zxe0z9OJkGIqViww_BRBVht31';
+  const STATE_ROW_KEY = 'kakeibo_v1'; // app_state テーブルの行キー
+
+  // supabase-js が読めなければローカルのみで動作（後方互換）
+  if (!window.supabase || !window.supabase.createClient) {
+    console.warn('[sync] supabase-js 未ロード。ローカルのみで動作します。');
+    return;
+  }
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true },
+  });
+
+  // --- 全データを1つのオブジェクトにまとめる/取り出す ---
+  function collectAllData() {
+    return {
+      records: state.records,
+      subscriptions: state.subscriptions,
+      targets: JSON.parse(localStorage.getItem(TARGETS_KEY) || '{}'),
+      assets: JSON.parse(localStorage.getItem(ASSETS_KEY) || '{}'),
+    };
+  }
+  function applyAllData(data) {
+    if (!data) return;
+    if (Array.isArray(data.records)) {
+      state.records.length = 0;
+      data.records.forEach(r => state.records.push(r));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records)); } catch(e) {}
+      // ID採番カウンタを更新
+      const maxId = state.records.reduce((m, r) => {
+        const n = parseInt((r.id || '').slice(1)) || 0; return Math.max(m, n);
+      }, 0);
+      if (typeof _idCounter !== 'undefined') _idCounter = maxId + 1;
+    }
+    if (Array.isArray(data.subscriptions)) {
+      state.subscriptions = data.subscriptions;
+      try { localStorage.setItem(SUB_STORAGE_KEY, JSON.stringify(state.subscriptions)); } catch(e) {}
+    }
+    if (data.targets) { try { localStorage.setItem(TARGETS_KEY, JSON.stringify(data.targets)); } catch(e) {} }
+    if (data.assets)  { try { localStorage.setItem(ASSETS_KEY, JSON.stringify(data.assets)); } catch(e) {} }
+  }
+
+  // --- 画面を再描画 ---
+  function rerenderAll() {
+    try {
+      const active = document.querySelector('.tab.active')?.dataset.screen || 'input';
+      if (active === 'dash') renderDashboard();
+      else if (active === 'rissa') renderRissa();
+      else if (active === 'list') renderList();
+      if (typeof refreshItemSuggest === 'function') refreshItemSuggest();
+      if (isDesktop() && typeof renderDesktop === 'function') renderDesktop();
+      // 開いているモーダルも更新
+      if (document.getElementById('deskAnnualPanel')?.classList.contains('show')) {
+        renderAnnualTable(); renderAssetsTable();
+      }
+      if (document.getElementById('deskManagePanel')?.classList.contains('show') && typeof dRenderList === 'function') {
+        dRenderList();
+      }
+      if (document.getElementById('deskSubPanel')?.classList.contains('show') && typeof renderSubTable === 'function') {
+        renderSubTable();
+      }
+    } catch (e) { console.warn('[sync] 再描画エラー', e); }
+  }
+
+  // --- 同期バッジ ---
+  let badgeTimer = null;
+  function showBadge(text, autoHide) {
+    const b = document.getElementById('syncBadge');
+    if (!b) return;
+    b.textContent = text; b.classList.add('show');
+    if (badgeTimer) clearTimeout(badgeTimer);
+    if (autoHide) badgeTimer = setTimeout(() => b.classList.remove('show'), 1400);
+  }
+  function hideBadge() {
+    const b = document.getElementById('syncBadge');
+    if (b) b.classList.remove('show');
+  }
+
+  // --- クラウドへ保存（デバウンス）---
+  let pushTimer = null, applyingRemote = false;
+  function pushNow() {
+    if (!currentSession) return;
+    showBadge('同期中…', false);
+    const payload = collectAllData();
+    sb.from('app_state').upsert({
+      key: STATE_ROW_KEY,
+      value: payload,
+      updated_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) { console.warn('[sync] 保存エラー', error); showBadge('同期失敗', true); }
+      else showBadge('同期済み ✓', true);
+    });
+  }
+  function pushDebounced() {
+    if (applyingRemote) return; // リモート反映中の保存はループ防止のためスキップ
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, 800);
+  }
+
+  // --- クラウドから取得して反映 ---
+  function pullAndApply() {
+    return sb.from('app_state').select('value').eq('key', STATE_ROW_KEY).maybeSingle()
+      .then(({ data, error }) => {
+        if (error) { console.warn('[sync] 取得エラー', error); return; }
+        if (data && data.value) {
+          applyingRemote = true;
+          applyAllData(data.value);
+          applyingRemote = false;
+          rerenderAll();
+        } else {
+          // クラウドが空 → 今のローカルデータを初回アップロード
+          pushNow();
+        }
+      });
+  }
+
+  // --- リアルタイム購読（他端末の変更を即反映）---
+  function subscribeRealtime() {
+    sb.channel('app_state_changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'app_state', filter: `key=eq.${STATE_ROW_KEY}` },
+        (payload) => {
+          if (applyingRemote) return;
+          const v = payload.new && payload.new.value;
+          if (v) {
+            applyingRemote = true;
+            applyAllData(v);
+            applyingRemote = false;
+            rerenderAll();
+            showBadge('更新を受信 ✓', true);
+          }
+        })
+      .subscribe();
+  }
+
+  // 外部（persist等）から呼ばれる窓口
+  window.cloudSync = { push: pushDebounced, pullNow: pullAndApply };
+
+  // ==========================================
+  // 認証
+  // ==========================================
+  let currentSession = null;
+  const loginOverlay = document.getElementById('loginOverlay');
+  const loginForm = document.getElementById('loginForm');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginErr = document.getElementById('loginErr');
+
+  function showLogin() { loginOverlay.classList.add('show'); }
+  function hideLogin() { loginOverlay.classList.remove('show'); }
+
+  async function onSignedIn(session) {
+    currentSession = session;
+    hideLogin();
+    showBadge('読み込み中…', false);
+    await pullAndApply();
+    subscribeRealtime();
+    showBadge('同期済み ✓', true);
+  }
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginErr.textContent = '';
+    loginBtn.disabled = true; loginBtn.textContent = 'ログイン中…';
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPass').value;
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    loginBtn.disabled = false; loginBtn.textContent = 'ログイン';
+    if (error) {
+      loginErr.textContent = 'ログインできませんでした。メールとパスワードをご確認ください。';
+      console.warn('[auth] ', error);
+      return;
+    }
+    if (data && data.session) onSignedIn(data.session);
+  });
+
+  // 起動時：既存セッションがあれば自動ログイン
+  sb.auth.getSession().then(({ data }) => {
+    if (data && data.session) onSignedIn(data.session);
+    else showLogin();
+  });
+
+  // セッション失効時など
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || !session) {
+      currentSession = null;
+      showLogin();
+    }
+  });
 })();
 </script>
 </body>
