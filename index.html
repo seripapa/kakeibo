@@ -103,7 +103,32 @@
     padding: 16px;
     padding-bottom: 110px;
     overflow-y: auto;
+    position: relative;
   }
+
+  /* 引っ張って更新（プルリフレッシュ） */
+  .ptr-indicator {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 0; overflow: hidden;
+    display: flex; align-items: flex-end; justify-content: center;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .ptr-inner {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding-bottom: 8px; color: var(--orange-deep);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  }
+  .ptr-spinner {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 2.5px solid var(--orange-150);
+    border-top-color: var(--orange);
+    transition: transform 0.1s linear;
+  }
+  .content.ptr-refreshing .ptr-spinner {
+    animation: ptrSpin 0.7s linear infinite;
+  }
+  @keyframes ptrSpin { to { transform: rotate(360deg); } }
 
   /* セグメント */
   .segment {
@@ -1555,6 +1580,13 @@
   </div>
 
   <div class="content">
+    <!-- 引っ張って更新インジケーター -->
+    <div class="ptr-indicator" id="ptrIndicator">
+      <div class="ptr-inner">
+        <div class="ptr-spinner" id="ptrSpinner"></div>
+        <span id="ptrText">引っ張って更新</span>
+      </div>
+    </div>
     <!-- 入力画面 -->
     <div id="screen-input" class="screen active">
       <div class="segment" id="modeSeg">
@@ -4816,6 +4848,78 @@ if (isDesktop()) renderDesktop();
       showLogin();
     }
   });
+})();
+
+// ==========================================
+// 引っ張って更新（プルリフレッシュ） ※iPhone等のタッチ端末のみ
+// ==========================================
+(function setupPullToRefresh() {
+  const content = document.querySelector('.content');
+  const indicator = document.getElementById('ptrIndicator');
+  const text = document.getElementById('ptrText');
+  if (!content || !indicator) return;
+
+  const THRESHOLD = 70;   // この距離以上引っ張ると更新
+  const MAX_PULL = 110;   // 余白の最大の広がり
+  let startY = 0, pulling = false, dist = 0, refreshing = false;
+
+  function setHeight(h) { indicator.style.height = h + 'px'; }
+
+  content.addEventListener('touchstart', e => {
+    if (refreshing) return;
+    // PCレイアウト中は無効
+    if (window.innerWidth >= 1024) return;
+    // 入力画面では無効（フォーム操作優先）
+    const active = document.querySelector('.tab.active')?.dataset.screen;
+    if (active === 'input') return;
+    // 最上部にいる時だけ開始
+    if (content.scrollTop > 0) { pulling = false; return; }
+    startY = e.touches[0].clientY;
+    pulling = true;
+    dist = 0;
+  }, { passive: true });
+
+  content.addEventListener('touchmove', e => {
+    if (!pulling || refreshing) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { setHeight(0); dist = 0; return; }
+    // 引っ張るほど重くなる（ゴム感）
+    dist = Math.min(MAX_PULL, dy * 0.5);
+    setHeight(dist);
+    const spinner = document.getElementById('ptrSpinner');
+    if (spinner) spinner.style.transform = `rotate(${dist * 3}deg)`;
+    if (text) text.textContent = dist >= THRESHOLD ? '指を離して更新' : '引っ張って更新';
+  }, { passive: true });
+
+  content.addEventListener('touchend', () => {
+    if (!pulling || refreshing) return;
+    pulling = false;
+    if (dist >= THRESHOLD && window.cloudSync && window.cloudSync.pullNow) {
+      // 更新実行
+      refreshing = true;
+      content.classList.add('ptr-refreshing');
+      setHeight(56);
+      if (text) text.textContent = '更新中…';
+      Promise.resolve(window.cloudSync.pullNow())
+        .catch(() => {})
+        .then(() => new Promise(r => setTimeout(r, 500))) // 最低0.5秒は表示
+        .then(() => {
+          indicator.style.transition = 'height 0.25s';
+          setHeight(0);
+          setTimeout(() => {
+            indicator.style.transition = '';
+            content.classList.remove('ptr-refreshing');
+            refreshing = false;
+            if (text) text.textContent = '引っ張って更新';
+          }, 260);
+        });
+    } else {
+      // しきい値未満 → 戻す
+      indicator.style.transition = 'height 0.2s';
+      setHeight(0);
+      setTimeout(() => { indicator.style.transition = ''; }, 220);
+    }
+  }, { passive: true });
 })();
 </script>
 </body>
