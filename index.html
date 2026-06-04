@@ -2595,16 +2595,22 @@ if (stored) {
 // ==========================================
 // 状態
 // ==========================================
+// 起動時点の年月（各画面の初期表示に使用）
+const _now = new Date();
+const NOW_YEAR = String(_now.getFullYear());
+const NOW_MONTH = String(_now.getMonth() + 1).padStart(2, '0');
+const NOW_YM = `${NOW_YEAR}-${NOW_MONTH}`;
+
 const state = {
   records: RECORDS,
   mode: 'expense',
   subMode: 'variable',
   selectedCategory: null,
   selectedType: null,
-  currentMonth: '2026-05',
-  rissaMonth: '2026-05',
-  listYear: '2026',
-  listMonth: '05',
+  currentMonth: NOW_YM,
+  rissaMonth: NOW_YM,
+  listYear: NOW_YEAR,
+  listMonth: NOW_MONTH,
   listCategory: '',
   listSort: 'date-desc', // 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
   editingId: null,
@@ -3823,8 +3829,8 @@ function dSave() {
   renderDesktop();
 }
 
-// PC版リスト用 state（mobile listとは独立）
-const dListState = { year: '2026', month: '', category: '', sort: 'date-desc' };
+// PC版リスト用 state（mobile listとは独立）。初期は当月を選択
+const dListState = { year: NOW_YEAR, month: NOW_MONTH, category: '', sort: 'date-desc' };
 
 function dInitList() {
   const years = [...new Set(state.records.map(r => r.date.slice(0, 4)))].sort();
